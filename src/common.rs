@@ -1,9 +1,14 @@
+extern crate serde;
+extern crate serde_json;
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct Record {
-    open: f32,
-    high: f32,
-    low: f32,
-    close: f32,
-    volume: f64,
+    pub open: f32,
+    pub high: f32,
+    pub low: f32,
+    pub close: f32,
+    pub volume: f64,
 }
 
 pub fn execute() {

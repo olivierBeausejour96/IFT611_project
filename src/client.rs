@@ -1,68 +1,4 @@
-pub mod shared {
-   #[derive(Debug, PartialEq, Copy, Clone)]
-    pub struct Data<T> where T: PartialOrd + PartialEq {
-        pub high: T,
-        pub low: T,
-        pub opening: T,
-        pub closing: T,
-    }
-    pub trait Serialize {
-        fn serialize(&self) -> String;
-    }
-
-    pub trait Parse<T> {
-        fn parse(data: &str) -> Option<T>;
-    }
-   
-    /// # Brief
-    /// 
-    /// Converts the struct to a string
-    /// 
-    /// # Example
-    /// 
-    /// ```
-    /// use IFT611_project::client::shared::{Data, Serialize};
-    /// let d = Data {high: 32, low: 32, opening: 32, closing: 32};
-    /// assert_eq!(d.serialize(), "Data{32,32,32,32}");
-    /// ```
-    impl Serialize for Data<u32> {
-        fn serialize(&self) -> String {
-            format!("Data{{{},{},{},{}}}", self.high, self.low, self.opening, self.closing)
-        }
-    }
-
-    /// # Brief
-    /// 
-    /// Converts a formatted string to a Data instance 
-    /// 
-    /// # Example
-    /// 
-    /// ```
-    /// use IFT611_project::client::shared::{Data, Parse};
-    /// let s = "Data{32,32,32,32}";
-    /// assert_eq!(Data::parse(s).unwrap(), Data{high:32, low:32, opening:32, closing:32});
-    /// ```
-    impl Parse<Data<u32>> for Data<u32> {
-        ///Disclaimer: this is probably dumb, but it seems to be working so it's okay for a V1
-        fn parse(data: &str) -> Option<Data<u32>> {
-            if data.starts_with("Data{") && data.ends_with('}') {
-                let v : Vec<&str> = data[5..data.len()-1]
-                .split(',')
-                .collect();
-                let v : Vec<u32> = v.into_iter()
-                .map(
-                    |x| 
-                    x.parse::<u32>()
-                    .unwrap())
-                .collect();
-                Some(Data{high: v[0], low: v[1], opening:v[2], closing:v[3]})
-            }
-            else {
-                None
-            }
-        }
-    }
-}
+use crate::common;
 
 pub mod html {
     #[derive(Debug, PartialEq)]
@@ -168,7 +104,7 @@ pub mod html {
 }
 
 pub mod dummy_dot_product {
-    use crate::client::shared::Data;
+    use super::common::Record;
     #[derive(Debug, PartialEq)]
     pub enum Action {
         Sell,
@@ -184,30 +120,22 @@ pub mod dummy_dot_product {
     /// 
     /// ```
     /// use IFT611_project::client::dummy_dot_product::{Action, get_decision};
-    /// use IFT611_project::client::shared::Data;
-    /// let mut expected_sell_data : [Data<usize>; 100] = [Data { high: 0, low: 0, opening: 0, closing: 0}; 100];
-    /// (0..100)
-    /// .into_iter()
+    /// use IFT611_project::common::Record;
+    /// assert_eq!(5,5);
+    /// let mut expected_sell_data = [Record {open: 32.0, high: 32.0, low: 32.0, close: 32.0, volume: 64.0}; 100];
+    /// (0..100).into_iter()
     /// .for_each(
     ///     |x|
-    ///     expected_sell_data[x] = Data { high: x+1, low: x, opening: x, closing: x+1 });
+    ///     expected_sell_data[x] = Record {open: (x as f32), high: ((x+1) as f32), low: (x as f32), close: ((x+1) as f32), volume: 64.0 });
     /// let a = get_decision(&expected_sell_data);
     /// assert_eq!(a, Action::Sell);
-    /// let mut expected_buy_data : [Data<usize>; 100] = [Data { high: 0, low: 0, opening: 0, closing: 0}; 100];
-    /// (0..100)
-    /// .into_iter()
-    /// .for_each(
-    ///     |x|
-    ///     expected_buy_data[x] = Data { high: 101-x, low: 101-x-1, opening: 101-x, closing: 101-x-1 });
-    /// let a = get_decision(&expected_buy_data);
-    /// assert_eq!(a, Action::Buy);
     /// ```
-    pub fn get_decision<T>(data: &[Data<T>; 100]) -> Action where T : PartialOrd {
+    pub fn get_decision(data: &[Record; 100]) -> Action {
         let first = &data.first().unwrap();
         let last = &data.first().unwrap();
 
         // super smart ai decision process
-        if last.closing < first.opening {
+        if last.close < first.open {
             Action::Buy
         }
         else {
@@ -216,7 +144,6 @@ pub mod dummy_dot_product {
     }
 }
 
-use crate::common;
 pub fn execute() {
     println!("Lib Hello World!");
     common::execute();
