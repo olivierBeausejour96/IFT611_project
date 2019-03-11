@@ -21,7 +21,7 @@ pub mod shared {
     /// # Example
     /// 
     /// ```
-    /// use ift611_user::shared::{Data, Serialize};
+    /// use IFT611_project::client::shared::{Data, Serialize};
     /// let d = Data {high: 32, low: 32, opening: 32, closing: 32};
     /// assert_eq!(d.serialize(), "Data{32,32,32,32}");
     /// ```
@@ -38,7 +38,7 @@ pub mod shared {
     /// # Example
     /// 
     /// ```
-    /// use ift611_user::shared::{Data, Parse};
+    /// use IFT611_project::client::shared::{Data, Parse};
     /// let s = "Data{32,32,32,32}";
     /// assert_eq!(Data::parse(s).unwrap(), Data{high:32, low:32, opening:32, closing:32});
     /// ```
@@ -79,7 +79,7 @@ pub mod html {
         /// # Example
         /// 
         /// ```
-        /// use ift611_user::html::Path;
+        /// use IFT611_project::client::html::Path;
         /// let sp0 = "~\\rust_projects\\ift611\\ift_611user\\";
         /// let sp1 = "~/rust_projects/ift611/ift_611user/";
         /// let p0 = Path::new(sp0);
@@ -107,7 +107,7 @@ pub mod html {
         /// # Example
         /// 
         /// ```
-        /// use ift611_user::html::Path;
+        /// use IFT611_project::client::html::Path;
         /// let p = Path::new("~/rust_projects/ift611/ift_611user/");
         /// assert_eq!(p.to_string(), "~/rust_projects/ift611/ift_611user/");
         /// ```
@@ -122,7 +122,7 @@ pub mod html {
         /// # Example
         /// 
         /// ```
-        /// use ift611_user::html::Path;
+        /// use IFT611_project::client::html::Path;
         /// let p = Path::new("~/rust_projects/ift611/ift_611user/");
         /// assert_eq!(p.to_string_custom("\\"), "~\\rust_projects\\ift611\\ift_611user\\");
         /// ```
@@ -144,7 +144,7 @@ pub mod html {
     /// # Example
     /// 
     /// ```
-    /// use ift611_user::html::get_string;
+    /// use IFT611_project::client::html::get_string;
     /// assert_eq!(get_string(), "GET / HTTP/1.1\r\n");
     /// ```
     pub fn get_string() -> String {
@@ -158,7 +158,7 @@ pub mod html {
     /// # Example
     /// 
     /// ```
-    /// use ift611_user::html::{Path, get_custom_string};
+    /// use IFT611_project::client::html::{Path, get_custom_string};
     /// let p = Path::new("~\\rust_projects\\ift611\\ift_611user");
     /// assert_eq!(get_custom_string(&p), "GET ~/rust_projects/ift611/ift_611user HTTP/1.1\r\n")
     /// ```
@@ -183,8 +183,8 @@ pub mod dummy_dot_product {
     /// # Example
     /// 
     /// ```
-    /// use ift611_user::dummy_dot_product::{Action, get_decision};
-    /// use ift611_user::shared::Data;
+    /// use IFT611_project::client::dummy_dot_product::{Action, get_decision};
+    /// use IFT611_project::client::shared::Data;
     /// let mut expected_sell_data : [Data<usize>; 100] = [Data { high: 0, low: 0, opening: 0, closing: 0}; 100];
     /// (0..100)
     /// .into_iter()
