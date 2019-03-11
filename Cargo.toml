@@ -1,0 +1,12 @@
+[package]
+name = "IFT611_project"
+version = "0.1.0"
+authors = ["retardedpunk <beao3002@usherbrooke.ca>"]
+edition = "2018"
+
+[dependencies]
+csv = "1.0.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.39"
+tiny_http = "0.6.2"
+bincode = "1.1.2"

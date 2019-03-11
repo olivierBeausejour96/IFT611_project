@@ -1,7 +1,0 @@
-[package]
-name = "ift611_user"
-version = "0.1.0"
-authors = ["retardedpunk <beao3002@usherbrooke.ca>"]
-edition = "2018"
-
-[dependencies]
