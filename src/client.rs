@@ -149,5 +149,44 @@ pub fn execute() {
     common::execute();
 }
 
+use common::{Record, Default};
+use std::net::{Ipv4Addr, TcpStream};
+use std::io::prelude::*;
 
+impl Default<Ipv4Addr> for Ipv4Addr {
+    fn default() -> Ipv4Addr {
+        Ipv4Addr::new(127, 0, 0, 1)
+    }
+}
+
+pub enum Market {
+    BTCUSD,
+}
+
+pub struct Client {
+    _server_addr: Ipv4Addr,
+}
+
+pub trait Trader {
+    fn get_quote(&self, market: &Market) -> Record; 
+}
+
+impl Client {
+    pub fn new(ip_addr: Ipv4Addr) -> Client {
+        Client { _server_addr: ip_addr }
+    }
+}
+
+impl Default<Client> for Client {
+    fn default() -> Client {
+        Client { _server_addr: Ipv4Addr::default() }
+    }
+}
+
+impl Trader for Client {
+    fn get_quote(&self, market: &Market) -> Record {
+        let mut stream = TcpStream::connect(&self._server_addr.to_string());
+        Record::default()
+    }
+}
 
