@@ -3,45 +3,41 @@ use crate::common;
 pub mod html {
     #[derive(Debug, PartialEq)]
     pub struct Path {
-        p : Vec<String>,
+        p: Vec<String>,
     }
 
     impl Path {
-
         /// # Brief
-        /// 
+        ///
         /// Construct a new Path instance from a string formatted with either / or \\ delimiters
-        /// 
+        ///
         /// # Example
-        /// 
+        ///
         /// ```
         /// use IFT611_project::client::html::Path;
         /// let sp0 = "~\\rust_projects\\ift611\\ift_611user\\";
         /// let sp1 = "~/rust_projects/ift611/ift_611user/";
         /// let p0 = Path::new(sp0);
         /// let p1 = Path::new(sp1);
-        /// 
+        ///
         /// assert_eq!(p0, p1);
         /// ```
         pub fn new(s: &str) -> Path {
-            let p : Vec<&str> = s.split(|c| c == '\\' || c == '/')
-            .collect();
-            let p : Vec<String> = p.into_iter()
-            .map(
-                |x|
-                String::from(x))
-            .collect();
+            let p: Vec<String> = s
+                .split(|c| c == '\\' || c == '/')
+                .map(|x| x.to_string())
+                .collect();
             Path { p }
         }
 
         /// # Brief
-        /// 
+        ///
         /// Construct a string representing the Path using the default delimiter '/'
         /// This function is simply defined as:
         /// self.to_string_custom("/")
-        /// 
+        ///
         /// # Example
-        /// 
+        ///
         /// ```
         /// use IFT611_project::client::html::Path;
         /// let p = Path::new("~/rust_projects/ift611/ift_611user/");
@@ -52,11 +48,11 @@ pub mod html {
         }
 
         /// # Brief
-        /// 
+        ///
         /// Construct a string representing the Path using the given delimiter
-        /// 
+        ///
         /// # Example
-        /// 
+        ///
         /// ```
         /// use IFT611_project::client::html::Path;
         /// let p = Path::new("~/rust_projects/ift611/ift_611user/");
@@ -73,12 +69,12 @@ pub mod html {
         }
     }
 
-    /// # Brief 
-    /// 
+    /// # Brief
+    ///
     /// Constructs a default html get Request for the root path
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use IFT611_project::client::html::get_string;
     /// assert_eq!(get_string(), "GET / HTTP/1.1\r\n");
@@ -88,18 +84,18 @@ pub mod html {
     }
 
     /// # Brief
-    /// 
+    ///
     /// Constructs a default html get Request for the given path
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use IFT611_project::client::html::{Path, get_custom_string};
     /// let p = Path::new("~\\rust_projects\\ift611\\ift_611user");
     /// assert_eq!(get_custom_string(&p), "GET ~/rust_projects/ift611/ift_611user HTTP/1.1\r\n")
     /// ```
     pub fn get_custom_string(p: &Path) -> String {
-        format!("GET {} HTTP/1.1\r\n", &p.to_string_custom("/"))    
+        format!("GET {} HTTP/1.1\r\n", &p.to_string_custom("/"))
     }
 }
 
@@ -109,15 +105,15 @@ pub mod dummy_dot_product {
     pub enum Action {
         Sell,
         Buy,
-        Hold
+        Hold,
     }
 
     /// # Brief
-    /// 
+    ///
     /// Given a window period of 100 time units, return either a buy or sell action using super dooper complex algorithm
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use IFT611_project::client::dummy_dot_product::{Action, get_decision};
     /// use IFT611_project::common::Record;
@@ -137,8 +133,7 @@ pub mod dummy_dot_product {
         // super smart ai decision process
         if last.close < first.open {
             Action::Buy
-        }
-        else {
+        } else {
             Action::Sell
         }
     }
@@ -149,9 +144,8 @@ pub fn execute() {
     common::execute();
 }
 
-use common::{Record, Default};
+use common::{Default, Record};
 use std::net::{Ipv4Addr, TcpStream};
-use std::io::prelude::*;
 
 impl Default<Ipv4Addr> for Ipv4Addr {
     fn default() -> Ipv4Addr {
@@ -168,24 +162,28 @@ pub struct Client {
 }
 
 pub trait Trader {
-    fn get_quote(&self, market: &Market) -> Record; 
+    fn get_quote(&self, market: &Market) -> Record;
 }
 
 impl Client {
     pub fn new(ip_addr: Ipv4Addr) -> Client {
-        Client { _server_addr: ip_addr }
+        Client {
+            _server_addr: ip_addr,
+        }
     }
 }
 
 impl Default<Client> for Client {
     fn default() -> Client {
-        Client { _server_addr: Ipv4Addr::default() }
+        Client {
+            _server_addr: Ipv4Addr::default(),
+        }
     }
 }
 
 impl Trader for Client {
-    fn get_quote(&self, market: &Market) -> Record {
-        let mut stream = TcpStream::connect(&self._server_addr.to_string());
+    fn get_quote(&self, _market: &Market) -> Record {
+        let mut _stream = TcpStream::connect(&self._server_addr.to_string());
         Record::default()
     }
 }

@@ -1,7 +1,6 @@
-extern crate IFT611_project;
+extern crate ift611_project;
 
-    #[test]
-    fn it_works() {
-        assert_eq!(5, 2+3);
-    }
-
+#[test]
+fn it_works() {
+    assert_eq!(5, 2 + 3);
+}

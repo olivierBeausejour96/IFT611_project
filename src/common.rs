@@ -1,6 +1,6 @@
 extern crate serde;
 extern crate serde_json;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct Record {
@@ -25,7 +25,7 @@ impl Default<Record> for Record {
             volume: 64.0,
         }
     }
-} 
+}
 
 pub fn execute() {
     println!("common Hello World!");

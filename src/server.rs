@@ -1,16 +1,18 @@
+extern crate bincode;
 extern crate csv;
+extern crate failure;
 extern crate serde;
 extern crate serde_json;
 extern crate tiny_http;
-extern crate bincode;
 
-use bincode::{serialize, deserialize};
-use serde::{Serialize, Deserialize};
+// use bincode::{serialize, deserialize};
+use failure::Error;
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tiny_http::{Method, Request, Response, Server};
 
-type Result<T> = std::result::Result<T, Box<std::error::Error>>;
+type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Serialize, Deserialize)]
 struct CSVRecord {
@@ -30,7 +32,7 @@ struct Record {
     high: f32,
     low: f32,
     close: f32,
-    volume: f64,    
+    volume: f64,
 }
 
 impl From<CSVRecord> for Record {
@@ -47,17 +49,25 @@ impl From<CSVRecord> for Record {
 
 #[derive(Deserialize)]
 struct Client {
-    ip: String,
-    port: u16,
+    _ip: String,
+    _port: u16,
 }
 
 fn load_data(filename: &str) -> Vec<Record> {
     let mut reader = csv::Reader::from_path(filename).unwrap();
 
-    reader.deserialize::<CSVRecord>().map(|result| Record::from(result.unwrap())).collect()
+    reader
+        .deserialize::<CSVRecord>()
+        .map(|result| Record::from(result.unwrap()))
+        .collect()
 }
 
-fn handle_request(mut req: Request, start_time: Instant, btc_records: &[Record], clients: &Mutex<Vec<Client>>) {
+fn handle_request(
+    mut req: Request,
+    start_time: Instant,
+    btc_records: &[Record],
+    clients: &Mutex<Vec<Client>>,
+) {
     let response = match (req.method(), req.url()) {
         (&Method::Get, "/") => Response::from_string("Hello!"),
         (&Method::Get, "/BTCUSD") => Response::from_string(current_data(start_time, btc_records)),
@@ -93,9 +103,7 @@ fn current_data(start_time: Instant, records: &[Record]) -> String {
     )
 }
 
-
-pub fn execute() {
-    let file = "data.csv";
+pub fn execute(file: &str) {
     let records = Arc::new(load_data(file));
     let clients = Arc::new(Mutex::new(vec![]));
 
