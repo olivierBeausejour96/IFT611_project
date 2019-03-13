@@ -1,6 +1,8 @@
 extern crate serde;
 extern crate serde_json;
+
 use serde::{Deserialize, Serialize};
+use std::default::Default;
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct Record {
@@ -11,11 +13,7 @@ pub struct Record {
     pub volume: f64,
 }
 
-pub trait Default<T> {
-    fn default() -> T;
-}
-
-impl Default<Record> for Record {
+impl Default for Record {
     fn default() -> Record {
         Record {
             open: 32.0,
@@ -24,6 +22,15 @@ impl Default<Record> for Record {
             close: 32.0,
             volume: 64.0,
         }
+    }
+}
+
+impl Record {
+    pub fn to_csv_str(&self) -> String {
+        format!(
+            "{},{},{},{},{}",
+            self.open, self.high, self.low, self.close, self.volume
+        )
     }
 }
 
