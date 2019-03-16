@@ -14,8 +14,8 @@ pub enum Action {
 /// # Example
 ///
 /// ```
-/// use IFT611_project::client::dummy_dot_product::{Action, get_decision};
-/// use IFT611_project::common::Record;
+/// use ift611_project::client::dummy_dot_product::{Action, get_decision};
+/// use ift611::common::Record;
 /// assert_eq!(5,5);
 /// let mut expected_sell_data = [Record {open: 32.0, high: 32.0, low: 32.0, close: 32.0, volume: 64.0}; 100];
 /// (0..100).into_iter()

@@ -1,8 +1,8 @@
-extern crate serde;
-extern crate serde_json;
-
+use reqwest::{Client, Method, Request, Url};
 use serde::{Deserialize, Serialize};
 use std::default::Default;
+use std::error::Error;
+use std::net::TcpStream;
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct Record {
@@ -36,4 +36,21 @@ impl Record {
 
 pub fn execute() {
     println!("common Hello World!");
+}
+
+pub fn get_btc_record(url: &str) -> Result<Record, Box<Error>> {
+    let request = Request::new(Method::GET, Url::parse(url)?.join("/BTCUSD")?);
+    let mut response = Client::new().execute(request)?;
+    let record: Record = response.json()?;
+    Ok(record)
+}
+
+pub fn subscribe_btc(url: &str) -> Result<TcpStream, Box<Error>> {
+    let request = Request::new(Method::GET, Url::parse(url)?.join("/subscribe/BTCUSD")?);
+    let mut response = Client::new().execute(request)?;
+    let ip = response.remote_addr().ok_or("no remote ip")?.ip();
+    let port = response.text()?.parse::<u16>()?;
+
+    let stream = TcpStream::connect((ip, port))?;
+    Ok(stream)
 }

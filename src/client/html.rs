@@ -11,7 +11,7 @@ impl Path {
     /// # Example
     ///
     /// ```
-    /// use IFT611_project::client::html::Path;
+    /// use ift611_project::client::html::Path;
     /// let sp0 = "~\\rust_projects\\ift611\\ift_611user\\";
     /// let sp1 = "~/rust_projects/ift611/ift_611user/";
     /// let p0 = Path::new(sp0);
@@ -36,7 +36,7 @@ impl Path {
     /// # Example
     ///
     /// ```
-    /// use IFT611_project::client::html::Path;
+    /// use ift611_project::client::html::Path;
     /// let p = Path::new("~/rust_projects/ift611/ift_611user/");
     /// assert_eq!(p.to_string(), "~/rust_projects/ift611/ift_611user/");
     /// ```
@@ -51,7 +51,7 @@ impl Path {
     /// # Example
     ///
     /// ```
-    /// use IFT611_project::client::html::Path;
+    /// use ift611_project::client::html::Path;
     /// let p = Path::new("~/rust_projects/ift611/ift_611user/");
     /// assert_eq!(p.to_string_custom("\\"), "~\\rust_projects\\ift611\\ift_611user\\");
     /// ```
@@ -73,7 +73,7 @@ impl Path {
 /// # Example
 ///
 /// ```
-/// use IFT611_project::client::html::get_string;
+/// use ift611_project::client::html::get_string;
 /// assert_eq!(get_string(), "GET / HTTP/1.1\r\n");
 /// ```
 pub fn get_string() -> String {
@@ -87,7 +87,7 @@ pub fn get_string() -> String {
 /// # Example
 ///
 /// ```
-/// use IFT611_project::client::html::{Path, get_custom_string};
+/// use ift611_project::client::html::{Path, get_custom_string};
 /// let p = Path::new("~\\rust_projects\\ift611\\ift_611user");
 /// assert_eq!(get_custom_string(&p), "GET ~/rust_projects/ift611/ift_611user HTTP/1.1\r\n")
 /// ```
