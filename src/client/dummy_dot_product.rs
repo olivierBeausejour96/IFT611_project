@@ -15,8 +15,7 @@ pub enum Action {
 ///
 /// ```
 /// use ift611_project::client::dummy_dot_product::{Action, get_decision};
-/// use ift611::common::Record;
-/// assert_eq!(5,5);
+/// use ift611_project::common::Record;
 /// let mut expected_sell_data = [Record {open: 32.0, high: 32.0, low: 32.0, close: 32.0, volume: 64.0}; 100];
 /// (0..100).into_iter()
 /// .for_each(
@@ -27,7 +26,7 @@ pub enum Action {
 /// ```
 pub fn get_decision(data: &[Record; 100]) -> Action {
     let first = &data.first().unwrap();
-    let last = &data.first().unwrap();
+    let last = &data.last().unwrap();
 
     // super smart ai decision process
     if last.close < first.open {
