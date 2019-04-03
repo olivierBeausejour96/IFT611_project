@@ -1,7 +1,7 @@
 pub mod dummy_dot_product;
 pub mod html;
 
-use crate::common::{self, Record};
+use crate::common::Record;
 use std::default::Default;
 use std::io::prelude::*;
 use std::net::{Ipv4Addr, TcpStream};
@@ -9,7 +9,6 @@ use std::string::ToString;
 
 pub fn execute() {
     println!("Lib Hello World!");
-    common::execute();
 }
 
 pub enum Market {
@@ -50,7 +49,7 @@ impl Default for Client {
 
 impl Trader for Client {
     fn get_quote(&self, market: &Market) -> Result<Record, &'static str> {
-        use html::{Path, get_custom_string};
+        use html::{get_custom_string, Path};
 
         let path = Path::new(&format!("/{}", market.to_string()));
         let request = get_custom_string(&path);
@@ -64,7 +63,6 @@ impl Trader for Client {
         } else {
             Err("Error occured trying to reach out for server")
         }
-        
     }
 }
 
@@ -74,4 +72,3 @@ pub fn parse_html_response_to_record(html_response: &str) -> Record {
     //record from string
     Record::default()
 }
-

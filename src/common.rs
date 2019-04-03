@@ -34,10 +34,6 @@ impl Record {
     }
 }
 
-pub fn execute() {
-    println!("common Hello World!");
-}
-
 pub fn get_btc_record(url: &str) -> Result<Record, Box<Error>> {
     let request = Request::new(Method::GET, Url::parse(url)?.join("/BTCUSD")?);
     let mut response = Client::new().execute(request)?;
