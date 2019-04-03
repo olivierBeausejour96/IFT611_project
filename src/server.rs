@@ -9,15 +9,23 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use tiny_http::{Method, Request, Response, Server};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct CSVRecord {
-    _timestamp: String,
-    _date: String,
-    _symbol: String,
+    #[serde(rename = "Unix Timestamp")]
+    timestamp: String,
+    #[serde(rename = "Date")]
+    date: String,
+    #[serde(rename = "Symbol")]
+    symbol: String,
+    #[serde(rename = "Open")]
     open: f32,
+    #[serde(rename = "High")]
     high: f32,
+    #[serde(rename = "Low")]
     low: f32,
+    #[serde(rename = "Close")]
     close: f32,
+    #[serde(rename = "Volume")]
     volume: f64,
 }
 
@@ -36,7 +44,7 @@ impl From<CSVRecord> for Record {
 const PERIOD: u64 = 1000;
 const PERIOD_DURATION: Duration = Duration::from_micros(PERIOD);
 
-pub fn execute(file: &str, http_port: u16, push_port: u16) {
+pub fn execute(file: &str, http_port: u16) {
     let records = Arc::new(load_data(file));
     let streams = Arc::new(Mutex::new(vec![]));
 
@@ -52,10 +60,11 @@ pub fn execute(file: &str, http_port: u16, push_port: u16) {
         });
     }
 
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let push_port = listener.local_addr().unwrap().port();
     {
         let streams = streams.clone();
         thread::spawn(move || {
-            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, push_port)).unwrap();
             for stream in listener.incoming() {
                 if let Ok(stream) = stream {
                     streams.lock().unwrap().push(stream);
@@ -119,4 +128,38 @@ fn handle_request(req: Request, start_time: Instant, btc_records: &[Record], pus
 fn get_current_data(start_time: Instant, records: &[Record]) -> String {
     let i = (start_time.elapsed().as_micros() / u128::from(PERIOD)) as usize;
     serde_json::to_string(&records[i]).unwrap()
+}
+
+mod test {
+    #[allow(unused_imports)]
+    use super::*;
+    #[allow(unused_imports)]
+    use crate::common::get_btc_record;
+    #[allow(unused_imports)]
+    use std::thread;
+
+    #[test]
+    fn deserialize_test() {
+        let data = r#"Unix Timestamp,Date,Symbol,Open,High,Low,Close,Volume
+1546300740000,2018-12-31 23:59:00,BTCUSD,3686.38,3692.35,3685.7,3692.35,4.1076909393
+1546300740000,2018-12-31 23:59:00,BTCUSD,3686.38,3692.35,3685.7,3692.35,4.1076909393
+1546300740000,2018-12-31 23:59:00,BTCUSD,3686.38,3692.35,3685.7,3692.35,4.1076909393
+"#;
+        let mut reader = csv::Reader::from_reader(data.as_bytes());
+        let records: Vec<Record> = reader
+            .deserialize::<CSVRecord>()
+            .map(|result| Record::from(result.unwrap()))
+            .collect();
+        assert_eq!(records.len(), 3);
+    }
+
+    #[test]
+    fn test() {
+        thread::spawn(move || {
+            execute("data.csv", 8080);
+        });
+
+        let result = get_btc_record("127.0.0.1:8080");
+        assert!(result.is_ok(), "get_btc_record shouldn't return an error");
+    }
 }

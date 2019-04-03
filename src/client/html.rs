@@ -1,3 +1,5 @@
+use std::string::ToString;
+
 #[derive(Debug, PartialEq)]
 pub struct Path {
     p: Vec<String>,
@@ -22,7 +24,7 @@ impl Path {
     pub fn new(s: &str) -> Path {
         let p: Vec<String> = s
             .split(|c| c == '\\' || c == '/')
-            .map(|x| x.to_string())
+            .map(ToString::to_string)
             .collect();
         Path { p }
     }

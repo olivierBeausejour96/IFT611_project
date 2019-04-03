@@ -4,7 +4,7 @@ use std::default::Default;
 use std::error::Error;
 use std::net::TcpStream;
 
-#[derive(Serialize, Deserialize, Copy, Clone)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Record {
     pub open: f32,
     pub high: f32,
