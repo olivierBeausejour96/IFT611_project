@@ -1,4 +1,4 @@
-use crate::common::Record;
+use crate::Record;
 
 #[derive(Debug, PartialEq)]
 pub enum Action {

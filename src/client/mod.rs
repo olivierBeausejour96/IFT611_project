@@ -1,7 +1,7 @@
 pub mod dummy_dot_product;
 pub mod html;
 
-use crate::common::Record;
+use crate::Record;
 use std::default::Default;
 use std::io::prelude::*;
 use std::net::{Ipv4Addr, TcpStream};

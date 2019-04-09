@@ -1,8 +1,10 @@
-use crate::common::Record;
+use crate::Record;
+use crate::logger;
 
 use std::io::Write;
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -46,19 +48,23 @@ const PERIOD_DURATION: Duration = Duration::from_micros(PERIOD);
 const MAX_CONNECTIONS: usize = 10;
 
 pub fn start(file: &str, http_port: u16) -> JoinHandle<()> {
+    println!("Starting server logger...");
+    let logger = logger::start("server_log.txt");
+
     println!("Loading records data...");
-    let records = Arc::new(load_data(file));
+    let records = Arc::new(load_data(logger.clone(), file));
 
     let streams = Arc::new(Mutex::new(Vec::with_capacity(MAX_CONNECTIONS)));
 
     println!("Starting push server...");
     let start_time = Instant::now();
     {
+        let logger = logger.clone();
         let streams = streams.clone();
         let start_time = start_time;
         let records = records.clone();
         thread::spawn(move || {
-            periodic_push(&streams, start_time, &records);
+            periodic_push(logger, &streams, start_time, &records);
         });
     }
 
@@ -66,6 +72,7 @@ pub fn start(file: &str, http_port: u16) -> JoinHandle<()> {
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
     let push_port = listener.local_addr().unwrap().port();
     {
+        let logger = logger.clone();
         let streams = streams.clone();
         thread::spawn(move || {
             for stream in listener.incoming() {
@@ -76,6 +83,9 @@ pub fn start(file: &str, http_port: u16) -> JoinHandle<()> {
                             .set_write_timeout(Some(PERIOD_DURATION / MAX_CONNECTIONS as u32))
                             .unwrap();
                         v.push(stream);
+                    } else {
+                        // TODO: This allocates, need to fix
+                        let _result = logger.send(String::from("insufficient amount of available connections"));
                     }
                 }
             }
@@ -86,21 +96,21 @@ pub fn start(file: &str, http_port: u16) -> JoinHandle<()> {
     let server = Server::http((Ipv4Addr::LOCALHOST, http_port)).unwrap();
     thread::spawn(move || {
         for request in server.incoming_requests() {
-            handle_request(request, start_time, &records, push_port);
+            handle_request(logger.clone(), request, start_time, &records, push_port);
         }
     })
 }
 
-fn periodic_push(streams: &Mutex<Vec<TcpStream>>, start_time: Instant, data: &[Record]) {
+fn periodic_push(mut logger: Sender<String>, streams: &Mutex<Vec<TcpStream>>, start_time: Instant, data: &[Record]) {
     let mut time_to_wake = Instant::now();
     loop {
-        push_data(streams, start_time, data);
+        push_data(&mut logger, streams, start_time, data);
         time_to_wake += PERIOD_DURATION;
         thread::sleep(time_to_wake - Instant::now());
     }
 }
 
-fn push_data(streams: &Mutex<Vec<TcpStream>>, start_time: Instant, data: &[Record]) {
+fn push_data(_logger: &mut Sender<String>, streams: &Mutex<Vec<TcpStream>>, start_time: Instant, data: &[Record]) {
     let mut streams = streams.lock().unwrap();
     static mut TO_REMOVE: [usize; MAX_CONNECTIONS] = [0; MAX_CONNECTIONS];
     static mut CURR: usize = 0;
@@ -121,7 +131,7 @@ fn push_data(streams: &Mutex<Vec<TcpStream>>, start_time: Instant, data: &[Recor
     }
 }
 
-fn load_data(filename: &str) -> Vec<Record> {
+fn load_data(_logger: Sender<String>, filename: &str) -> Vec<Record> {
     let mut reader = csv::Reader::from_path(filename).unwrap();
 
     reader
@@ -131,7 +141,7 @@ fn load_data(filename: &str) -> Vec<Record> {
         .collect()
 }
 
-fn handle_request(req: Request, start_time: Instant, btc_records: &[Record], push_port: u16) {
+fn handle_request(_logger: Sender<String>, req: Request, start_time: Instant, btc_records: &[Record], push_port: u16) {
     let response = match (req.method(), req.url()) {
         (&Method::Get, "/") => Response::from_string("Hello!"),
         (&Method::Get, "/BTCUSD") => {
@@ -152,7 +162,9 @@ mod test {
     #[allow(unused_imports)]
     use super::{start, CSVRecord, Deserialize, Record};
     #[allow(unused_imports)]
-    use crate::common::get_btc_record;
+    use crate::get_btc_record;
+    #[allow(unused_imports)]
+    use crate::subscribe_btc;
     #[allow(unused_imports)]
     use std::thread;
 
@@ -172,13 +184,23 @@ mod test {
     }
 
     #[test]
-    fn test() {
+    fn query_test() {
         start("data.csv", 8080);
-        println!("Server started");
         let result = get_btc_record("http://127.0.0.1:8080");
         assert!(
             result.is_ok(),
             format!("get_btc_record shouldn't return an error: {:?}", result)
+        );
+    }
+
+    #[test]
+    fn subscribe_test() {
+        start("data.csv", 8080);
+        let result = subscribe_btc("http://127.0.0.1:8080");
+
+        assert!(
+            result.is_ok(),
+            format!("subscribe_btc shouldn't return an error: {:?}", result)
         );
     }
 }
