@@ -1,6 +1,6 @@
 pub mod client;
-pub mod server;
 pub mod logger;
+pub mod server;
 
 use reqwest::{Client, Method, Request, Url};
 use serde::{Deserialize, Serialize};

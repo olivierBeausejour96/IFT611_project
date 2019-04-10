@@ -1,10 +1,9 @@
+use crate::logger::Logger;
 use crate::Record;
-use crate::logger;
 
 use std::io::Write;
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::Sender;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -49,7 +48,7 @@ const MAX_CONNECTIONS: usize = 10;
 
 pub fn start(file: &str, http_port: u16) -> JoinHandle<()> {
     println!("Starting server logger...");
-    let logger = logger::start("server_log.txt");
+    let logger = Logger::start("server_log.txt");
 
     println!("Loading records data...");
     let records = Arc::new(load_data(logger.clone(), file));
@@ -84,8 +83,9 @@ pub fn start(file: &str, http_port: u16) -> JoinHandle<()> {
                             .unwrap();
                         v.push(stream);
                     } else {
-                        // TODO: This allocates, need to fix
-                        let _result = logger.send(String::from("insufficient amount of available connections"));
+                        let _result = logger.warning(|| {
+                            "maximum number of connections is insufficient".to_string()
+                        });
                     }
                 }
             }
@@ -101,7 +101,12 @@ pub fn start(file: &str, http_port: u16) -> JoinHandle<()> {
     })
 }
 
-fn periodic_push(mut logger: Sender<String>, streams: &Mutex<Vec<TcpStream>>, start_time: Instant, data: &[Record]) {
+fn periodic_push(
+    mut logger: Logger,
+    streams: &Mutex<Vec<TcpStream>>,
+    start_time: Instant,
+    data: &[Record],
+) {
     let mut time_to_wake = Instant::now();
     loop {
         push_data(&mut logger, streams, start_time, data);
@@ -110,7 +115,12 @@ fn periodic_push(mut logger: Sender<String>, streams: &Mutex<Vec<TcpStream>>, st
     }
 }
 
-fn push_data(_logger: &mut Sender<String>, streams: &Mutex<Vec<TcpStream>>, start_time: Instant, data: &[Record]) {
+fn push_data(
+    _logger: &mut Logger,
+    streams: &Mutex<Vec<TcpStream>>,
+    start_time: Instant,
+    data: &[Record],
+) {
     let mut streams = streams.lock().unwrap();
     static mut TO_REMOVE: [usize; MAX_CONNECTIONS] = [0; MAX_CONNECTIONS];
     static mut CURR: usize = 0;
@@ -131,7 +141,7 @@ fn push_data(_logger: &mut Sender<String>, streams: &Mutex<Vec<TcpStream>>, star
     }
 }
 
-fn load_data(_logger: Sender<String>, filename: &str) -> Vec<Record> {
+fn load_data(_logger: Logger, filename: &str) -> Vec<Record> {
     let mut reader = csv::Reader::from_path(filename).unwrap();
 
     reader
@@ -141,7 +151,13 @@ fn load_data(_logger: Sender<String>, filename: &str) -> Vec<Record> {
         .collect()
 }
 
-fn handle_request(_logger: Sender<String>, req: Request, start_time: Instant, btc_records: &[Record], push_port: u16) {
+fn handle_request(
+    _logger: Logger,
+    req: Request,
+    start_time: Instant,
+    btc_records: &[Record],
+    push_port: u16,
+) {
     let response = match (req.method(), req.url()) {
         (&Method::Get, "/") => Response::from_string("Hello!"),
         (&Method::Get, "/BTCUSD") => {
