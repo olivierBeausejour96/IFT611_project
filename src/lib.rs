@@ -46,10 +46,10 @@ pub fn get_btc_record(url: &str) -> Result<Record, Box<Error>> {
 }
 
 pub fn subscribe_btc(url: &str) -> Result<TcpStream, Box<Error>> {
-    let request = Request::new(Method::GET, Url::parse(url)?.join("/subscribe/BTCUSD")?);
+    let request = Request::new(Method::POST, Url::parse(url)?.join("/subscribe/BTCUSD")?);
     let mut response = Client::new().execute(request)?;
     let ip = response.remote_addr().ok_or("no remote ip")?.ip();
-    let port = response.text()?.parse::<u16>()?;
+    let port = response.text()?.trim().parse::<u16>()?;
 
     let stream = TcpStream::connect((ip, port))?;
     Ok(stream)

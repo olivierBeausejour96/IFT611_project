@@ -1,14 +1,43 @@
-use crate::logger::Logger;
+use crate::logger::{Context, Logger};
 use crate::Record;
 
 use std::io::Write;
-use std::net::{Ipv4Addr, TcpListener, TcpStream};
+use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tiny_http::{Method, Request, Response, Server};
+
+#[derive(Copy, Clone)]
+enum LogVariants {
+    LoadingRecords,
+    StartingPushServer,
+    StartingSubscriptionServer,
+    StartingHttpServer,
+    MaxConnectionsInsufficient,
+    RemovingConnection(SocketAddr),
+}
+
+impl Context for LogVariants {
+    fn context_string(&self) -> String {
+        match self {
+            LogVariants::LoadingRecords => "Loading records data...".to_string(),
+            LogVariants::StartingPushServer => "Starting push server...".to_string(),
+            LogVariants::StartingSubscriptionServer => {
+                "Starting subscription server...".to_string()
+            }
+            LogVariants::StartingHttpServer => "Starting http server...".to_string(),
+            LogVariants::MaxConnectionsInsufficient => {
+                "maximum number of connections is insufficient".to_string()
+            }
+            LogVariants::RemovingConnection(addr) => {
+                format!("removing: {} from active connections", addr)
+            }
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct CSVRecord {
@@ -47,27 +76,14 @@ const PERIOD_DURATION: Duration = Duration::from_micros(PERIOD);
 const MAX_CONNECTIONS: usize = 10;
 
 pub fn start(file: &str, http_port: u16) -> JoinHandle<()> {
-    println!("Starting server logger...");
-    let logger = Logger::start("server_log.txt");
+    let logger = Logger::<LogVariants>::start("server_log.txt");
 
-    println!("Loading records data...");
-    let records = Arc::new(load_data(logger.clone(), file));
+    let _result = logger.warning(LogVariants::LoadingRecords);
+    let records = Arc::new(load_data(file));
 
     let streams = Arc::new(Mutex::new(Vec::with_capacity(MAX_CONNECTIONS)));
 
-    println!("Starting push server...");
-    let start_time = Instant::now();
-    {
-        let logger = logger.clone();
-        let streams = streams.clone();
-        let start_time = start_time;
-        let records = records.clone();
-        thread::spawn(move || {
-            periodic_push(logger, &streams, start_time, &records);
-        });
-    }
-
-    println!("Starting subscribtion server...");
+    let _result = logger.warning(LogVariants::StartingSubscriptionServer);
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
     let push_port = listener.local_addr().unwrap().port();
     {
@@ -83,26 +99,43 @@ pub fn start(file: &str, http_port: u16) -> JoinHandle<()> {
                             .unwrap();
                         v.push(stream);
                     } else {
-                        let _result = logger.warning(|| {
-                            "maximum number of connections is insufficient".to_string()
-                        });
+                        let _result = logger.warning(LogVariants::MaxConnectionsInsufficient);
                     }
                 }
             }
         });
     }
 
-    println!("Starting server...");
+    let _result = logger.warning(LogVariants::StartingHttpServer);
+    let start_time = Instant::now();
     let server = Server::http((Ipv4Addr::LOCALHOST, http_port)).unwrap();
-    thread::spawn(move || {
-        for request in server.incoming_requests() {
-            handle_request(logger.clone(), request, start_time, &records, push_port);
-        }
-    })
+    let http_server_handle = {
+        let logger = logger.clone();
+        let records = records.clone();
+
+        thread::spawn(move || {
+            for request in server.incoming_requests() {
+                handle_request(logger.clone(), request, start_time, &records, push_port);
+            }
+        })
+    };
+
+    let _result = logger.warning(LogVariants::StartingPushServer);
+    {
+        let logger = logger.clone();
+        let streams = streams.clone();
+        let start_time = start_time;
+        let records = records.clone();
+        thread::spawn(move || {
+            periodic_push(logger, &streams, start_time, &records);
+        });
+    }
+
+    http_server_handle
 }
 
 fn periodic_push(
-    mut logger: Logger,
+    mut logger: Logger<LogVariants>,
     streams: &Mutex<Vec<TcpStream>>,
     start_time: Instant,
     data: &[Record],
@@ -116,7 +149,7 @@ fn periodic_push(
 }
 
 fn push_data(
-    _logger: &mut Logger,
+    logger: &mut Logger<LogVariants>,
     streams: &Mutex<Vec<TcpStream>>,
     start_time: Instant,
     data: &[Record],
@@ -136,12 +169,15 @@ fn push_data(
     }
     unsafe {
         for i in &TO_REMOVE[0..CURR] {
+            let addr = streams[*i].peer_addr().unwrap();
+            let _result = logger.info(LogVariants::RemovingConnection(addr));
             streams.remove(*i);
         }
+        CURR = 0;
     }
 }
 
-fn load_data(_logger: Logger, filename: &str) -> Vec<Record> {
+fn load_data(filename: &str) -> Vec<Record> {
     let mut reader = csv::Reader::from_path(filename).unwrap();
 
     reader
@@ -152,7 +188,7 @@ fn load_data(_logger: Logger, filename: &str) -> Vec<Record> {
 }
 
 fn handle_request(
-    _logger: Logger,
+    _logger: Logger<LogVariants>,
     req: Request,
     start_time: Instant,
     btc_records: &[Record],
@@ -164,7 +200,7 @@ fn handle_request(
             Response::from_string(get_current_data(start_time, btc_records))
         }
         (&Method::Post, "/subscribe/BTCUSD") => Response::from_string(push_port.to_string()),
-        _ => Response::from_string("").with_status_code(404),
+        (method, url) => Response::from_string(format!("Invalid request: {} at {}", method, url)).with_status_code(404),
     };
     req.respond(response).unwrap();
 }
@@ -200,8 +236,14 @@ mod test {
     }
 
     #[test]
-    fn query_test() {
+    fn test() {
         start("data.csv", 8080);
+        query_test();
+        subscribe_test();
+    }
+
+    #[allow(dead_code)]
+    fn query_test() {
         let result = get_btc_record("http://127.0.0.1:8080");
         assert!(
             result.is_ok(),
@@ -209,11 +251,9 @@ mod test {
         );
     }
 
-    #[test]
+    #[allow(dead_code)]
     fn subscribe_test() {
-        start("data.csv", 8080);
         let result = subscribe_btc("http://127.0.0.1:8080");
-
         assert!(
             result.is_ok(),
             format!("subscribe_btc shouldn't return an error: {:?}", result)
