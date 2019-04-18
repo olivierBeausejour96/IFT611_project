@@ -6,7 +6,7 @@ use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::Write;
 use std::string::ToString;
-use std::sync::mpsc::{self, SendError, Sender};
+use std::sync::mpsc::{self, SendError, SyncSender};
 use std::thread;
 use std::time::Instant;
 
@@ -45,12 +45,12 @@ impl<T: Context> Display for LogMessage<T> {
 }
 
 #[derive(Clone)]
-pub struct Logger<T: Context>(Sender<LogMessage<T>>);
+pub struct Logger<T: Context>(SyncSender<LogMessage<T>>);
 
 impl<T: 'static + Context> Logger<T> {
-    pub fn start(logger_name: &str) -> Self {
+    pub fn start(logger_name: &str, message_queue_size: usize) -> Self {
         let mut file = File::create(logger_name).unwrap();
-        let (send_chan, recv_chan) = mpsc::channel::<LogMessage<T>>();
+        let (send_chan, recv_chan) = mpsc::sync_channel::<LogMessage<T>>(message_queue_size);
 
         thread::spawn(move || {
             while let Ok(log_message) = recv_chan.recv() {

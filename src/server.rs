@@ -74,9 +74,10 @@ impl From<CSVRecord> for Record {
 const PERIOD: u64 = 1000;
 const PERIOD_DURATION: Duration = Duration::from_micros(PERIOD);
 const MAX_CONNECTIONS: usize = 10;
+const LOGGER_QUEUE_SIZE: usize = 100;
 
 pub fn start(file: &str, http_port: u16) -> JoinHandle<()> {
-    let logger = Logger::<LogVariants>::start("server_log.txt");
+    let logger = Logger::<LogVariants>::start("server_log.txt", LOGGER_QUEUE_SIZE);
 
     let _result = logger.warning(LogVariants::LoadingRecords);
     let records = Arc::new(load_data(file));
