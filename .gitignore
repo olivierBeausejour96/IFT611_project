@@ -1,3 +1,4 @@
 /target
 **/*.rs.bk
 .vscode
+server_log.csv

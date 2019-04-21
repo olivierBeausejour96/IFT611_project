@@ -416,6 +416,7 @@ dependencies = [
 name = "ift611_project"
 version = "0.1.0"
 dependencies = [
+ "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "criterion 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "csv 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.11 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -1,14 +1,13 @@
 mod log_level;
 
-use std::convert::{From, Into};
-use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::Write;
 use std::string::ToString;
-use std::sync::mpsc::{self, SendError, SyncSender};
+use std::sync::mpsc::{self, SyncSender};
 use std::thread;
-use std::time::Instant;
+
+use chrono::{DateTime, Utc};
 
 use log_level::LogLevel;
 
@@ -17,13 +16,13 @@ pub trait Context: Send {
 }
 
 struct LogMessage<T: Context> {
-    timestamp: Instant,
+    timestamp: DateTime<Utc>,
     level: LogLevel,
     context: T,
 }
 
 impl<T: Context> LogMessage<T> {
-    pub fn new(timestamp: Instant, level: LogLevel, context: T) -> Self {
+    pub fn new(timestamp: DateTime<Utc>, level: LogLevel, context: T) -> Self {
         LogMessage {
             timestamp,
             level,
@@ -34,9 +33,9 @@ impl<T: Context> LogMessage<T> {
 
 impl<T: Context> Display for LogMessage<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "{:?}, {}, {}",
+            "{}, {}, {}",
             self.timestamp,
             self.level,
             self.context.context_string()
@@ -54,53 +53,35 @@ impl<T: 'static + Context> Logger<T> {
 
         thread::spawn(move || {
             while let Ok(log_message) = recv_chan.recv() {
-                file.write_all(log_message.to_string().as_bytes()).unwrap();
+                let result = file.write_all(log_message.to_string().as_bytes());
+                if result.is_err() {
+                    eprintln!(
+                        "{}, logger could not write log message successfully: {}",
+                        Utc::now(),
+                        result.unwrap_err()
+                    );
+                }
             }
         });
 
         Logger(send_chan)
     }
 
-    pub fn info(&self, context: T) -> Result<(), LoggerError> {
+    pub fn info(&self, context: T) {
         self.0
-            .send(LogMessage::new(Instant::now(), LogLevel::Info, context))
-            .map_err(Into::into)
+            .send(LogMessage::new(Utc::now(), LogLevel::Info, context))
+            .unwrap();
     }
 
-    pub fn warning(&self, context: T) -> Result<(), LoggerError> {
+    pub fn warning(&self, context: T) {
         self.0
-            .send(LogMessage::new(Instant::now(), LogLevel::Warning, context))
-            .map_err(Into::into)
+            .send(LogMessage::new(Utc::now(), LogLevel::Warning, context))
+            .unwrap();
     }
 
-    pub fn error(&self, context: T) -> Result<(), LoggerError> {
+    pub fn error(&self, context: T) {
         self.0
-            .send(LogMessage::new(Instant::now(), LogLevel::Error, context))
-            .map_err(Into::into)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct LoggerError;
-
-impl Display for LoggerError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "sending to logging thread failed, receiver is dead")
-    }
-}
-
-impl Error for LoggerError {
-    fn description(&self) -> &str {
-        "sending to logging thread failed, received is dead"
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        None
-    }
-}
-
-impl<T: Context> From<SendError<LogMessage<T>>> for LoggerError {
-    fn from(_err: SendError<LogMessage<T>>) -> Self {
-        Self {}
+            .send(LogMessage::new(Utc::now(), LogLevel::Error, context))
+            .unwrap();
     }
 }

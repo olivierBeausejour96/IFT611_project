@@ -6,6 +6,7 @@ use reqwest::{Client, Method, Request, Url};
 use serde::{Deserialize, Serialize};
 use std::default::Default;
 use std::error::Error;
+use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
@@ -45,12 +46,19 @@ pub fn get_btc_record(url: &str) -> Result<Record, Box<Error>> {
     Ok(record)
 }
 
-pub fn subscribe_btc(url: &str) -> Result<TcpStream, Box<Error>> {
+pub fn subscribe_btc(url: &str) -> Result<BufReader<TcpStream>, Box<Error>> {
     let request = Request::new(Method::POST, Url::parse(url)?.join("/subscribe/BTCUSD")?);
     let mut response = Client::new().execute(request)?;
     let ip = response.remote_addr().ok_or("no remote ip")?.ip();
     let port = response.text()?.trim().parse::<u16>()?;
 
-    let stream = TcpStream::connect((ip, port))?;
-    Ok(stream)
+    let reader = BufReader::new(TcpStream::connect((ip, port))?);
+    Ok(reader)
+}
+
+pub fn read_record(reader: &mut BufReader<TcpStream>) -> Result<Record, Box<Error>> {
+    let mut buf = String::with_capacity(100);
+    let _ = reader.read_line(&mut buf)?;
+    let record: Record = serde_json::from_str(&buf)?;
+    Ok(record)
 }
