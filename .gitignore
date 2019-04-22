@@ -2,3 +2,4 @@
 **/*.rs.bk
 .vscode
 server_log.csv
+test_log*.csv

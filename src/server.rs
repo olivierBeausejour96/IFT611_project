@@ -7,16 +7,17 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
+use crossbeam::channel::tick;
 use serde::{Deserialize, Serialize};
 use tiny_http::{Method, Request, Response, Server};
 
 #[derive(Copy, Clone)]
-enum ServerLogs {
+pub enum ServerLogs {
     LoadingRecords,
     StartingPushServer,
     StartingSubscriptionServer,
     StartingHttpServer,
-    MaxConnectionsInsufficient,
+    MaxSubscribersInsufficient,
     MissedPushDeadline,
     ClientUnreachable(SocketAddr),
     PushingToSubscriber(SocketAddr),
@@ -30,7 +31,7 @@ impl Context for ServerLogs {
             ServerLogs::StartingPushServer => "Starting push server...".to_string(),
             ServerLogs::StartingSubscriptionServer => "Starting subscription server...".to_string(),
             ServerLogs::StartingHttpServer => "Starting http server...".to_string(),
-            ServerLogs::MaxConnectionsInsufficient => {
+            ServerLogs::MaxSubscribersInsufficient => {
                 "maximum number of connections is insufficient".to_string()
             }
             ServerLogs::MissedPushDeadline => "missed a deadline on subscription push".to_string(),
@@ -79,7 +80,7 @@ pub struct ServerBuilder {
     data_file: String,
     http_port: u16,
     period: u64,
-    max_connections: usize,
+    max_subscriber_count: usize,
     logger_queue_size: usize,
     max_records_amount: Option<usize>,
 }
@@ -90,7 +91,7 @@ impl ServerBuilder {
             data_file: data_file.to_owned(),
             http_port: 80,
             period: 1000,
-            max_connections: 10,
+            max_subscriber_count: 10,
             logger_queue_size: 100,
             max_records_amount: None,
         }
@@ -104,9 +105,9 @@ impl ServerBuilder {
         Self { period, ..self }
     }
 
-    pub fn with_max_connections(self, max_connections: usize) -> Self {
+    pub fn with_max_subscriber_count(self, max_subscriber_count: usize) -> Self {
         Self {
-            max_connections,
+            max_subscriber_count,
             ..self
         }
     }
@@ -126,112 +127,124 @@ impl ServerBuilder {
     }
 
     pub fn build_and_start(self) -> JoinHandle<()> {
-        start(self)
+        let logger = Logger::<ServerLogs>::start("server_log.csv", self.logger_queue_size);
+
+        logger.info(ServerLogs::LoadingRecords);
+        let records = Arc::new(load_data(&self.data_file, self.max_records_amount));
+        let streams = Arc::new(Mutex::new(Vec::with_capacity(self.max_subscriber_count)));
+
+        let (_, push_port) = start_subscription_server(&self, logger.clone(), streams.clone());
+
+        let start_time = Instant::now();
+        let http_server_handle = start_http_server(
+            logger.clone(),
+            self.http_port,
+            push_port,
+            start_time,
+            self.period,
+            records.clone(),
+        );
+
+        start_push_server(
+            logger.clone(),
+            start_time,
+            self.period,
+            records.clone(),
+            streams.clone(),
+        );
+
+        http_server_handle
     }
 }
 
-fn start(builder: ServerBuilder) -> JoinHandle<()> {
-    let logger = Logger::<ServerLogs>::start("server_log.csv", builder.logger_queue_size);
-
-    logger.info(ServerLogs::LoadingRecords);
-    let records = Arc::new(load_data(&builder.data_file, builder.max_records_amount));
-
-    let streams = Arc::new(Mutex::new(Vec::with_capacity(builder.max_connections)));
-
-    logger.info(ServerLogs::StartingSubscriptionServer);
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
-    let push_port = listener.local_addr().unwrap().port();
-    {
-        let logger = logger.clone();
-        let streams = streams.clone();
-        let max_connections = builder.max_connections;
-        let write_timeout = Duration::from_micros(builder.period / builder.max_connections as u64);
-        thread::spawn(move || {
-            for stream in listener.incoming() {
-                if let Ok(stream) = stream {
-                    let mut v = streams.lock().unwrap();
-                    if v.len() <= max_connections {
-                        logger.info(ServerLogs::AddingSubscriber(stream.peer_addr().unwrap()));
-                        stream.set_write_timeout(Some(write_timeout)).unwrap();
-                        stream.set_nonblocking(true).unwrap();
-                        v.push(stream);
-                    } else {
-                        logger.warning(ServerLogs::MaxConnectionsInsufficient);
-                    }
-                }
-            }
-        });
-    }
-
-    logger.info(ServerLogs::StartingHttpServer);
-    let period = builder.period;
-    let start_time = Instant::now();
-    let server = Server::http((Ipv4Addr::LOCALHOST, builder.http_port)).unwrap();
-    let http_server_handle = {
-        let logger = logger.clone();
-        let records = records.clone();
-
-        thread::spawn(move || {
-            for request in server.incoming_requests() {
-                handle_request(
-                    logger.clone(),
-                    request,
-                    start_time,
-                    &records,
-                    push_port,
-                    period,
-                );
-            }
-        })
-    };
-
-    logger.info(ServerLogs::StartingPushServer);
-    {
-        let logger = logger.clone();
-        let streams = streams.clone();
-        let start_time = start_time;
-        let records = records.clone();
-        thread::spawn(move || {
-            periodic_push(logger, &streams, start_time, period, &records);
-        });
-    }
-
-    http_server_handle
-}
-
-fn periodic_push(
+fn start_http_server(
     logger: Logger<ServerLogs>,
-    streams: &Mutex<Vec<TcpStream>>,
+    http_port: u16,
+    push_port: u16,
     start_time: Instant,
     period: u64,
-    data: &[Record],
-) {
-    let period_duration = Duration::from_micros(period);
-    let mut time_to_wake = Instant::now();
-    loop {
-        push_data(&logger, streams, start_time, period, data);
-        time_to_wake += period_duration;
-        let now = Instant::now();
-        if now >= time_to_wake {
-            time_to_wake += period_duration;
-            logger.error(ServerLogs::MissedPushDeadline);
-        } else {
-            thread::sleep(time_to_wake - now);
+    records: Arc<Vec<Record>>,
+) -> JoinHandle<()> {
+    logger.info(ServerLogs::StartingHttpServer);
+
+    let server = Server::http((Ipv4Addr::LOCALHOST, http_port)).unwrap();
+
+    thread::spawn(move || {
+        for request in server.incoming_requests() {
+            handle_request(
+                logger.clone(),
+                request,
+                start_time,
+                &records,
+                push_port,
+                period,
+            );
         }
-    }
+    })
 }
 
-fn push_data(
+fn start_subscription_server(
+    builder: &ServerBuilder,
+    logger: Logger<ServerLogs>,
+    streams: Arc<Mutex<Vec<TcpStream>>>,
+) -> (JoinHandle<()>, u16) {
+    logger.info(ServerLogs::StartingSubscriptionServer);
+
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let push_port = listener.local_addr().unwrap().port();
+    let max_subscriber_count = builder.max_subscriber_count;
+    let write_timeout = Duration::from_micros(builder.period / builder.max_subscriber_count as u64);
+
+    let handle = thread::spawn(move || {
+        for stream in listener.incoming() {
+            if let Ok(stream) = stream {
+                let mut v = streams.lock().unwrap();
+                if v.len() <= max_subscriber_count {
+                    logger.info(ServerLogs::AddingSubscriber(stream.peer_addr().unwrap()));
+                    stream.set_write_timeout(Some(write_timeout)).unwrap();
+                    stream.set_nonblocking(true).unwrap();
+                    v.push(stream);
+                } else {
+                    logger.warning(ServerLogs::MaxSubscribersInsufficient);
+                }
+            }
+        }
+    });
+
+    (handle, push_port)
+}
+
+fn start_push_server(
+    logger: Logger<ServerLogs>,
+    start_time: Instant,
+    period: u64,
+    records: Arc<Vec<Record>>,
+    streams: Arc<Mutex<Vec<TcpStream>>>,
+) -> JoinHandle<()> {
+    logger.info(ServerLogs::StartingPushServer);
+
+    thread::spawn(move || {
+        let period_duration = Duration::from_micros(period);
+        let ticker = tick(period_duration);
+        while let Ok(wake_time) = ticker.recv() {
+            push_data(&logger, &streams, start_time, period, &records);
+            if wake_time.elapsed() > period_duration {
+                logger.error(ServerLogs::MissedPushDeadline);
+            }
+        }
+    })
+}
+
+pub fn push_data<T: Serialize>(
     _logger: &Logger<ServerLogs>,
     streams: &Mutex<Vec<TcpStream>>,
     start_time: Instant,
     period: u64,
-    data: &[Record],
+    data: &[T],
 ) {
     let mut streams = streams.lock().unwrap();
     let current_data = get_current_data(start_time, period, data).into_bytes();
     streams.retain(|mut stream| {
-        _logger.info(ServerLogs::PushingToSubscriber(stream.peer_addr().unwrap()));
         let result = stream.write_all(&current_data);
         result.is_ok()
     });
@@ -277,9 +290,9 @@ fn handle_request(
     }
 }
 
-fn get_current_data(start_time: Instant, period: u64, records: &[Record]) -> String {
+fn get_current_data<T: Serialize>(start_time: Instant, period: u64, data: &[T]) -> String {
     let i = (start_time.elapsed().as_micros() / u128::from(period)) as usize;
-    serde_json::to_string(&records[i]).unwrap() + "\n"
+    serde_json::to_string(&data[i]).unwrap() + "\n"
 }
 
 mod test {

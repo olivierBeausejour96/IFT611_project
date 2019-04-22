@@ -4,10 +4,10 @@ use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::Write;
 use std::string::ToString;
-use std::sync::mpsc::{self, SyncSender};
 use std::thread;
 
 use chrono::{DateTime, Utc};
+use crossbeam::channel::{self, Sender};
 
 use log_level::LogLevel;
 
@@ -44,12 +44,12 @@ impl<T: Context> Display for LogMessage<T> {
 }
 
 #[derive(Clone)]
-pub struct Logger<T: Context>(SyncSender<LogMessage<T>>);
+pub struct Logger<T: Context>(Sender<LogMessage<T>>);
 
 impl<T: 'static + Context> Logger<T> {
     pub fn start(logger_name: &str, message_queue_size: usize) -> Self {
         let mut file = File::create(logger_name).unwrap();
-        let (send_chan, recv_chan) = mpsc::sync_channel::<LogMessage<T>>(message_queue_size);
+        let (send_chan, recv_chan) = channel::bounded::<LogMessage<T>>(message_queue_size);
 
         thread::spawn(move || {
             while let Ok(log_message) = recv_chan.recv() {
