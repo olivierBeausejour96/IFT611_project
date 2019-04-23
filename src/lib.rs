@@ -37,13 +37,25 @@ impl Record {
             self.open, self.high, self.low, self.close, self.volume
         )
     }
+
+    pub fn from_csv_str(csv_str: &str) -> Result<Self, Box<Error>> {
+        let fields: Vec<_> = csv_str.split(',').map(str::trim).collect();
+        Ok(
+            Record {
+                open: fields[3].parse()?,
+                high: fields[4].parse()?,
+                low: fields[5].parse()?,
+                close: fields[6].parse()?,
+                volume: fields[7].parse()?,
+            }
+        )
+    }
 }
 
 pub fn get_btc_record(url: &str) -> Result<Record, Box<Error>> {
     let request = Request::new(Method::GET, Url::parse(url)?.join("/BTCUSD")?);
     let mut response = Client::new().execute(request)?;
-    let record: Record = response.json()?;
-    Ok(record)
+    Record::from_csv_str(&response.text()?)
 }
 
 pub fn subscribe_btc(url: &str) -> Result<BufReader<TcpStream>, Box<Error>> {
@@ -59,6 +71,5 @@ pub fn subscribe_btc(url: &str) -> Result<BufReader<TcpStream>, Box<Error>> {
 pub fn read_record(reader: &mut BufReader<TcpStream>) -> Result<Record, Box<Error>> {
     let mut buf = String::with_capacity(100);
     let _ = reader.read_line(&mut buf)?;
-    let record: Record = serde_json::from_str(&buf)?;
-    Ok(record)
+    Record::from_csv_str(&buf)
 }

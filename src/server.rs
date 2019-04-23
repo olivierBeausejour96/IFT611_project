@@ -1,14 +1,13 @@
 use crate::logger::{Context, Logger};
-use crate::Record;
 
-use std::io::Write;
+use std::io::{Write, BufRead, BufReader};
+use std::fs::File;
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use crossbeam::channel::tick;
-use serde::{Deserialize, Serialize};
 use tiny_http::{Method, Request, Response, Server};
 
 #[derive(Copy, Clone)]
@@ -40,38 +39,6 @@ impl Context for ServerLogs {
                 format!("pushing data to subscriber: {}", addr)
             }
             ServerLogs::AddingSubscriber(addr) => format!("adding subscriber: {}", addr),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct CSVRecord {
-    #[serde(rename = "Unix Timestamp")]
-    timestamp: String,
-    #[serde(rename = "Date")]
-    date: String,
-    #[serde(rename = "Symbol")]
-    symbol: String,
-    #[serde(rename = "Open")]
-    open: f32,
-    #[serde(rename = "High")]
-    high: f32,
-    #[serde(rename = "Low")]
-    low: f32,
-    #[serde(rename = "Close")]
-    close: f32,
-    #[serde(rename = "Volume")]
-    volume: f64,
-}
-
-impl From<CSVRecord> for Record {
-    fn from(rec: CSVRecord) -> Self {
-        Record {
-            open: rec.open,
-            high: rec.high,
-            low: rec.low,
-            close: rec.close,
-            volume: rec.volume,
         }
     }
 }
@@ -163,7 +130,7 @@ fn start_http_server(
     push_port: u16,
     start_time: Instant,
     period: u64,
-    records: Arc<Vec<Record>>,
+    records: Arc<Vec<String>>,
 ) -> JoinHandle<()> {
     logger.info(ServerLogs::StartingHttpServer);
 
@@ -218,7 +185,7 @@ fn start_push_server(
     logger: Logger<ServerLogs>,
     start_time: Instant,
     period: u64,
-    records: Arc<Vec<Record>>,
+    records: Arc<Vec<String>>,
     streams: Arc<Mutex<Vec<TcpStream>>>,
 ) -> JoinHandle<()> {
     logger.info(ServerLogs::StartingPushServer);
@@ -226,43 +193,34 @@ fn start_push_server(
     thread::spawn(move || {
         let period_duration = Duration::from_micros(period);
         let ticker = tick(period_duration);
-        while let Ok(wake_time) = ticker.recv() {
+        while let Ok(_wake_time) = ticker.recv() {
             push_data(&logger, &streams, start_time, period, &records);
-            if wake_time.elapsed() > period_duration {
-                logger.error(ServerLogs::MissedPushDeadline);
-            }
         }
     })
 }
 
-pub fn push_data<T: Serialize>(
+pub fn push_data(
     _logger: &Logger<ServerLogs>,
     streams: &Mutex<Vec<TcpStream>>,
     start_time: Instant,
     period: u64,
-    data: &[T],
+    data: &[String],
 ) {
     let mut streams = streams.lock().unwrap();
-    let current_data = get_current_data(start_time, period, data).into_bytes();
+    let current_data = get_current_data(start_time, period, data).as_bytes();
     streams.retain(|mut stream| {
         let result = stream.write_all(&current_data);
         result.is_ok()
     });
 }
 
-fn load_data(filename: &str, max_records_amount: Option<usize>) -> Vec<Record> {
-    let mut reader = csv::Reader::from_path(filename).unwrap();
+fn load_data(filename: &str, max_records_amount: Option<usize>) -> Vec<String> {
+    let file = File::open(filename).unwrap_or_else(|_| panic!("invalid filename: {}", filename));
+    let reader = BufReader::new(&file);
 
     match max_records_amount {
-        Some(amount) => reader
-            .deserialize::<CSVRecord>()
-            .take(amount)
-            .map(|result| Record::from(result.unwrap()))
-            .collect(),
-        None => reader
-            .deserialize::<CSVRecord>()
-            .map(|result| Record::from(result.unwrap()))
-            .collect(),
+        Some(amount) => reader.lines().skip(1).map(|result| result.unwrap() + "\n").take(amount).collect(),
+        None => reader.lines().skip(1).map(|result| result.unwrap() + "\n").collect(),
     }
 }
 
@@ -270,7 +228,7 @@ fn handle_request(
     logger: Logger<ServerLogs>,
     req: Request,
     start_time: Instant,
-    btc_records: &[Record],
+    btc_records: &[String],
     push_port: u16,
     period: u64,
 ) {
@@ -290,9 +248,9 @@ fn handle_request(
     }
 }
 
-fn get_current_data<T: Serialize>(start_time: Instant, period: u64, data: &[T]) -> String {
+fn get_current_data(start_time: Instant, period: u64, data: &[String]) -> &str {
     let i = (start_time.elapsed().as_micros() / u128::from(period)) as usize;
-    serde_json::to_string(&data[i]).unwrap() + "\n"
+    &data[i]
 }
 
 mod test {
@@ -302,21 +260,6 @@ mod test {
     use crate::{get_btc_record, read_record, subscribe_btc};
     #[allow(unused_imports)]
     use std::thread;
-
-    #[test]
-    fn deserialize_test() {
-        let data = r#"Unix Timestamp,Date,Symbol,Open,High,Low,Close,Volume
-1546300740000,2018-12-31 23:59:00,BTCUSD,3686.38,3692.35,3685.7,3692.35,4.1076909393
-1546300740000,2018-12-31 23:59:00,BTCUSD,3686.38,3692.35,3685.7,3692.35,4.1076909393
-1546300740000,2018-12-31 23:59:00,BTCUSD,3686.38,3692.35,3685.7,3692.35,4.1076909393
-"#;
-        let mut reader = csv::Reader::from_reader(data.as_bytes());
-        let records: Vec<Record> = reader
-            .deserialize::<CSVRecord>()
-            .map(|result| Record::from(result.unwrap()))
-            .collect();
-        assert_eq!(records.len(), 3);
-    }
 
     #[test]
     fn test() {

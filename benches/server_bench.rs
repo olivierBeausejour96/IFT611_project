@@ -42,7 +42,7 @@ fn push_data_benchmark(c: &mut Criterion) {
     populate_streams(port, streams.clone());
 
     let logger = Logger::<ServerLogs>::start("test_log.csv", 100);
-    let data: Vec<_> = (0..1000).map(|_| "I am a string!").collect();
+    let data: Vec<String> = (0..1000).map(|_| "I am a string!".to_string()).collect();
     let start_time = Instant::now();
 
     c.bench_function("server-push_data", move |b| {
