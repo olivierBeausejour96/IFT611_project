@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate criterion;
-extern crate ift611_project;
 
 use criterion::{black_box, Criterion, ParameterizedBenchmark};
 use ift611_project::logger::{Context, Logger};

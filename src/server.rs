@@ -1,7 +1,7 @@
 use crate::logger::{Context, Logger};
 
-use std::io::{Write, BufRead, BufReader};
 use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -219,8 +219,17 @@ fn load_data(filename: &str, max_records_amount: Option<usize>) -> Vec<String> {
     let reader = BufReader::new(&file);
 
     match max_records_amount {
-        Some(amount) => reader.lines().skip(1).map(|result| result.unwrap() + "\n").take(amount).collect(),
-        None => reader.lines().skip(1).map(|result| result.unwrap() + "\n").collect(),
+        Some(amount) => reader
+            .lines()
+            .skip(1)
+            .map(|result| result.unwrap() + "\n")
+            .take(amount)
+            .collect(),
+        None => reader
+            .lines()
+            .skip(1)
+            .map(|result| result.unwrap() + "\n")
+            .collect(),
     }
 }
 
@@ -251,49 +260,4 @@ fn handle_request(
 fn get_current_data(start_time: Instant, period: u64, data: &[String]) -> &str {
     let i = (start_time.elapsed().as_micros() / u128::from(period)) as usize;
     &data[i]
-}
-
-mod test {
-    #[allow(unused_imports)]
-    use super::*;
-    #[allow(unused_imports)]
-    use crate::{get_btc_record, read_record, subscribe_btc};
-    #[allow(unused_imports)]
-    use std::thread;
-
-    #[test]
-    fn test() {
-        ServerBuilder::new("data.csv")
-            .with_http_port(8080)
-            .with_max_records_amount(Some(100))
-            .with_period(100_000)
-            .build_and_start();
-        query_test();
-        subscribe_test();
-    }
-
-    #[allow(dead_code)]
-    fn query_test() {
-        let result = get_btc_record("http://127.0.0.1:8080");
-        assert!(
-            result.is_ok(),
-            format!("get_btc_record shouldn't return an error: {:?}", result)
-        );
-    }
-
-    #[allow(dead_code)]
-    fn subscribe_test() {
-        let result = subscribe_btc("http://127.0.0.1:8080");
-        assert!(
-            result.is_ok(),
-            format!("subscribe_btc shouldn't return an error: {:?}", result)
-        );
-
-        let mut reader = result.unwrap();
-        let result = read_record(&mut reader);
-        assert!(
-            result.is_ok(),
-            format!("read_record shouldn't return an error: {:?}", result)
-        );
-    }
 }

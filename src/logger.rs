@@ -1,5 +1,3 @@
-mod log_level;
-
 use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::Write;
@@ -9,7 +7,26 @@ use std::thread;
 use chrono::{DateTime, Utc};
 use crossbeam::channel::{self, Sender};
 
-use log_level::LogLevel;
+#[derive(Copy, Clone)]
+pub enum LogLevel {
+    Info,
+    Warning,
+    Error,
+}
+
+impl Display for LogLevel {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                LogLevel::Info => "INFO",
+                LogLevel::Warning => "WARNING",
+                LogLevel::Error => "ERROR",
+            }
+        )
+    }
+}
 
 pub trait Context: Send {
     fn context_string(&self) -> String;
