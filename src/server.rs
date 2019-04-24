@@ -1,13 +1,11 @@
 use crate::logger::{Context, Logger};
-
+use crossbeam::channel::tick;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
-
-use crossbeam::channel::tick;
 use tiny_http::{Method, Request, Response, Server};
 
 #[derive(Copy, Clone)]

@@ -4,7 +4,7 @@ use ift611_project::client::*;
 use ift611_project::server::*;
 
 #[test]
-fn test() {
+fn server_test() {
     ServerBuilder::new("data.csv")
         .with_http_port(8080)
         .with_max_records_amount(Some(100))

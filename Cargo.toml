@@ -15,6 +15,10 @@ harness = false
 name = "server_bench"
 harness = false
 
+[[bench]]
+name = "client_bench"
+harness = false
+
 [dependencies]
 csv = "1.0.5"
 serde = { version = "1.0", features = ["derive"] }

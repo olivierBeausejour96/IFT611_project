@@ -1,11 +1,10 @@
+use chrono::{DateTime, Utc};
+use crossbeam::channel::{self, Sender};
 use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::Write;
 use std::string::ToString;
 use std::thread;
-
-use chrono::{DateTime, Utc};
-use crossbeam::channel::{self, Sender};
 
 #[derive(Copy, Clone)]
 pub enum LogLevel {
