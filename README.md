@@ -7,6 +7,9 @@ Build the binaries ``cargo build --release``
 Start the server in one shell ``target/release/server data.csv -p 8080 --period 100000``  
 Start the client in another ``target/release/client http://127.0.0.1:8080``  
 
+# Windows
+The project does not work under Windows, but using the Windows Subsystem for Linux works fine  
+
 # Running the benchmarks:
 Simply run ``cargo bench``. The report will be in ``target/criterion/report/index.html``  
 
