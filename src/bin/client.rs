@@ -18,6 +18,7 @@ fn main() {
         .arg(
             Arg::with_name("strategy")
                 .help("Sets the trading strategy to use")
+                .long("strategy")
                 .takes_value(true)
                 .value_name("STRATEGY")
                 .possible_values(&["dummy"]),
@@ -25,6 +26,7 @@ fn main() {
         .arg(
             Arg::with_name("writer")
                 .help("Sets where decisions are written")
+                .long("writer")
                 .takes_value(true)
                 .value_name("WRITER")
                 .possible_values(&["file", "stdout"]),
