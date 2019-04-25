@@ -124,7 +124,8 @@ impl TradingPair {
         let ip = response.remote_addr().ok_or("no remote ip")?.ip();
         let port = response.text()?.trim().parse::<u16>()?;
 
-        let reader = BufReader::new(TcpStream::connect((ip, port))?);
+        let stream = TcpStream::connect((ip, port))?;
+        let reader = BufReader::new(stream);
         Ok(Connection::new(reader))
     }
 }
@@ -154,6 +155,7 @@ impl<T: BufRead> Iterator for Connection<T> {
     type Item = Record;
 
     fn next(&mut self) -> Option<Self::Item> {
+        self.buffer.clear();
         let _ = self.reader.read_line(&mut self.buffer).ok()?;
         Record::from_csv_str(&self.buffer).ok()
     }

@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use crossbeam::channel::{self, Sender};
 use std::fmt::{self, Display, Formatter};
-use std::fs::File;
 use std::io::Write;
 use std::string::ToString;
 use std::thread;
@@ -63,13 +62,12 @@ impl<T: Context> Display for LogMessage<T> {
 pub struct Logger<T: Context>(Sender<LogMessage<T>>);
 
 impl<T: 'static + Context> Logger<T> {
-    pub fn start(logger_name: &str, message_queue_size: usize) -> Self {
-        let mut file = File::create(logger_name).unwrap();
+    pub fn start<U: 'static + Send + Write>(mut writer: U, message_queue_size: usize) -> Self {
         let (send_chan, recv_chan) = channel::bounded::<LogMessage<T>>(message_queue_size);
 
         thread::spawn(move || {
             while let Ok(log_message) = recv_chan.recv() {
-                let result = file.write_all(log_message.to_string().as_bytes());
+                let result = writer.write_all(log_message.to_string().as_bytes());
                 if result.is_err() {
                     eprintln!(
                         "{}, logger could not write log message successfully: {}",

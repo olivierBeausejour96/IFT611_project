@@ -2,14 +2,13 @@
 extern crate criterion;
 
 use ift611_project::logger::Logger;
-use ift611_project::server::{push_data, ServerLogs};
-
+use ift611_project::server::{push_data};
 use criterion::Criterion;
-
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
+use std::fs::File;
 
 fn start_dummy_server(streams: Arc<Mutex<Vec<TcpStream>>>) -> u16 {
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
@@ -41,7 +40,7 @@ fn push_data_benchmark(c: &mut Criterion) {
     let port = start_dummy_server(streams.clone());
     populate_streams(port, streams.clone());
 
-    let logger = Logger::<ServerLogs>::start("test_log.csv", 100);
+    let logger = Logger::start(File::create("test_log.csv").unwrap(), 100);
     let data: Vec<String> = (0..1000).map(|_| "I am a string!".to_string()).collect();
     let start_time = Instant::now();
 

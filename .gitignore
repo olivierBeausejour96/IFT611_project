@@ -3,3 +3,4 @@
 .vscode
 server_log.csv
 test_log*.csv
+decisions_log*.csv

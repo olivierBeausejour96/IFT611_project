@@ -92,7 +92,7 @@ impl ServerBuilder {
     }
 
     pub fn build_and_start(self) -> JoinHandle<()> {
-        let logger = Logger::<ServerLogs>::start("server_log.csv", self.logger_queue_size);
+        let logger = Logger::start(File::create("server_log.csv").unwrap(), self.logger_queue_size);
 
         logger.info(ServerLogs::LoadingRecords);
         let records = Arc::new(load_data(&self.data_file, self.max_records_amount));
@@ -216,18 +216,11 @@ fn load_data(filename: &str, max_records_amount: Option<usize>) -> Vec<String> {
     let file = File::open(filename).unwrap_or_else(|_| panic!("invalid filename: {}", filename));
     let reader = BufReader::new(&file);
 
+    let lines = reader.lines().skip(1).map(|result| result.unwrap() + "\n");
+
     match max_records_amount {
-        Some(amount) => reader
-            .lines()
-            .skip(1)
-            .map(|result| result.unwrap() + "\n")
-            .take(amount)
-            .collect(),
-        None => reader
-            .lines()
-            .skip(1)
-            .map(|result| result.unwrap() + "\n")
-            .collect(),
+        Some(amount) => lines.take(amount).collect(),
+        None => lines.collect(),
     }
 }
 

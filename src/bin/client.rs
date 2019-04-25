@@ -2,6 +2,8 @@ use circular_queue::CircularQueue;
 use clap::{App, Arg};
 use ift611_project::client::*;
 use ift611_project::logger::Logger;
+use std::io::stdout;
+use std::fs::File;
 
 fn main() {
     let matches = App::new("HFT Client")
@@ -20,14 +22,25 @@ fn main() {
                 .value_name("STRATEGY")
                 .possible_values(&["dummy"]),
         )
+        .arg(
+            Arg::with_name("writer")
+                .help("Sets where decisions are written")
+                .takes_value(true)
+                .value_name("WRITER")
+                .possible_values(&["file", "stdout"]),
+        )
         .get_matches();
 
     let url = matches.value_of("URL").unwrap();
-    let strategy: TradingStrategy = matches.value_of("strategy").unwrap().into();
+    let strategy: TradingStrategy = matches.value_of("strategy").unwrap_or("dummy").into();
 
-    let logger = Logger::<DecisionLogs>::start("decicions.csv", 100);
+    let logger = match matches.value_of("writer").unwrap_or("stdout") {
+        "file" => Logger::start(File::create("decisions_log.csv").unwrap(), 100),
+        "stdout" => Logger::start(stdout(), 100),
+        _ => Logger::start(stdout(), 100),
+    };
+
     let mut queue = CircularQueue::with_capacity(100);
-    queue.push(TradingPair::BTCUSD.get_record(url).unwrap());
 
     for record in TradingPair::BTCUSD.subscribe(url).unwrap() {
         queue.push(record);
