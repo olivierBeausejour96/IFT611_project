@@ -1,3 +1,5 @@
+// Author: Karim Elmougi
+
 use crate::logger::{Context, Logger};
 use crossbeam::channel::tick;
 use std::fs::File;

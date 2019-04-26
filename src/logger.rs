@@ -1,3 +1,5 @@
+// Author: Karim Elmougi
+
 use chrono::{DateTime, Utc};
 use crossbeam::channel::{self, Sender};
 use std::fmt::{self, Display, Formatter};

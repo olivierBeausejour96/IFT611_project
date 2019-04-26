@@ -1,3 +1,5 @@
+// Author: Karim Elmougi
+
 use circular_queue::CircularQueue;
 use clap::{App, Arg};
 use ift611_project::client::*;

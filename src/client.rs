@@ -1,3 +1,5 @@
+// Author: Karim Elmougi
+
 use crate::logger::Context;
 use circular_queue::CircularQueue;
 use reqwest::{Client, Method, Request, Url};

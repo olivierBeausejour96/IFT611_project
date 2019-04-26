@@ -1,3 +1,5 @@
+// Author: Karim Elmougi
+
 #[macro_use]
 extern crate criterion;
 
